@@ -1,27 +1,33 @@
-import { TabPool } from "./tabPool.js";
+const fetch = require("node-fetch");
+const renderPage = require("./renderPage");
+const rewrite = require("./rewrite");
 
-const pool = new TabPool(
-  document.getElementById("tabs"),
-  document.getElementById("frames")
-);
+module.exports = async function browser(req, res) {
+  const url = req.query.url;
+  if (!url) {
+    res.statusCode = 400;
+    res.end("URL required");
+    return;
+  }
 
-function normalize(v) {
-  if (v.startsWith("http")) return v;
-  if (v.includes(".") && !v.includes(" "))
-    return "https://" + v;
-  return "https://www.google.com/search?q=" + encodeURIComponent(v);
-}
+  try {
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0"
+      }
+    });
 
-export function go(value) {
-  const input = value || address.value;
-  pool.navigate(normalize(input));
-}
+    const contentType = r.headers.get("content-type") || "text/html";
+    res.setHeader("Content-Type", contentType);
 
-window.addEventListener("message", e => {
-  if (e.data?.type === "navigate") go(e.data.value);
-});
+    if (!contentType.includes("text/html")) {
+      r.body.pipe(res);
+      return;
+    }
 
-document.getElementById("newTab").onclick = () => pool.newTab();
-address.addEventListener("keydown", e => {
-  if (e.key === "Enter") go();
-});
+    await renderPage(r, url, res);
+  } catch (e) {
+    res.statusCode = 500;
+    res.end("Browser fetch failed");
+  }
+};
