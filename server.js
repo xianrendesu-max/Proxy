@@ -1,76 +1,48 @@
 const express = require("express");
 const fetch = require("node-fetch");
-const path = require("path");
-const { URL } = require("url");
+const rewriteHtml = require("./rewrite");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 静的HTML
-app.use(express.static(__dirname));
+app.use(express.static("public"));
 
-/**
- * HTML内のURLを書き換える関数
- */
-function rewriteHtml(html, baseUrl) {
-  return html.replace(
-    /(href|src)=["']([^"']+)["']/gi,
-    (match, attr, link) => {
-      // data:, mailto:, javascript: は無視
-      if (
-        link.startsWith("data:") ||
-        link.startsWith("mailto:") ||
-        link.startsWith("javascript:")
-      ) {
-        return match;
-      }
+/* HTMLページ取得 */
+app.get("/page", async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ error: "URL required" });
 
-      try {
-        const absoluteUrl = new URL(link, baseUrl).href;
-        return `${attr}="/proxy?url=${encodeURIComponent(absoluteUrl)}"`;
-      } catch {
-        return match;
-      }
-    }
-  );
-}
-
-// プロキシ本体
-app.get("/proxy", async (req, res) => {
-  const target = req.query.url;
-  if (!target) {
-    res.status(400).send("URLが指定されていません");
-    return;
-  }
-
-  let response;
   try {
-    response = await fetch(target, {
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      }
+    const r = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+    const html = await r.text();
+    const rewritten = rewriteHtml(html, url);
+
+    res.json({
+      url,
+      secure: url.startsWith("https://"),
+      html: rewritten
     });
   } catch {
-    res.status(500).send("取得エラー");
-    return;
+    res.status(500).json({ error: "Fetch failed" });
   }
+});
 
-  const contentType = response.headers.get("content-type") || "";
+/* CSS / JS / 画像 */
+app.get("/asset", async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.sendStatus(400);
 
-  // HTML → 書き換え
-  if (contentType.includes("text/html")) {
-    const html = await response.text();
-    const rewritten = rewriteHtml(html, target);
-    res.set("content-type", "text/html; charset=utf-8");
-    res.send(rewritten);
-    return;
+  try {
+    const r = await fetch(url);
+    res.set("content-type", r.headers.get("content-type"));
+    r.body.pipe(res);
+  } catch {
+    res.sendStatus(500);
   }
-
-  // CSS / JS / 画像 / フォント → そのまま転送
-  res.set("content-type", contentType);
-  response.body.pipe(res);
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log("Mini Chrome running on port " + PORT);
 });
