@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>about bank</title>
+<link rel="stylesheet" href="/loading.css">
+<style>
+body { margin:0; font-family:system-ui; background:#f1f3f4; }
+#tabs { display:flex; gap:4px; padding:6px; background:#dee1e6; }
+.tab {
+  background:#e8eaed; padding:6px 10px;
+  border-radius:8px 8px 0 0;
+  display:flex; gap:6px; cursor:pointer;
+}
+.tab.active { background:#fff; }
+.tab .close { font-size:12px; cursor:pointer; }
+
+#toolbar {
+  display:flex; gap:6px; padding:8px;
+  background:#fff; border-bottom:1px solid #ccc;
+}
+#address {
+  flex:1; padding:8px;
+  border-radius:16px; border:1px solid #ccc;
+}
+
+iframe {
+  width:100%;
+  height:calc(100vh - 92px);
+  border:none;
+  display:none;
+}
+iframe.active { display:block; }
+</style>
+</head>
+
+<body>
+
+<div id="loadingBar"></div>
+
+<div id="tabs">
+  <button onclick="newTab()">＋</button>
+</div>
+
+<div id="toolbar">
+  <div id="lock">home</div>
+  <input id="address" placeholder="検索またはURL">
+  <button onclick="go()">Go</button>
+</div>
+
+<div id="frames"></div>
+
+<script>
+let tabs={}, active=null, id=0;
+
+function startLoading(){
+  const b=document.getElementById("loadingBar");
+  b.style.width="20%";
+  setTimeout(()=>b.style.width="70%",200);
+}
+function endLoading(){
+  const b=document.getElementById("loadingBar");
+  b.style.width="100%";
+  setTimeout(()=>b.style.width="0%",300);
+}
+
+function newTab(){
+  const tid=id++;
+  tabs[tid]={ history:[], index:-1 };
+
+  const tab=document.createElement("div");
+  tab.className="tab";
+  tab.draggable=true;
+  tab.innerHTML=`<span>Home</span><span class="close">×</span>`;
+  tab.onclick=()=>activate(tid);
+  tab.querySelector(".close").onclick=e=>{
+    e.stopPropagation();
+    closeTab(tid);
+  };
+  document.getElementById("tabs").appendChild(tab);
+
+  const frame=document.createElement("iframe");
+  frame.src="/home.html";
+  document.getElementById("frames").appendChild(frame);
+
+  tabs[tid].tab=tab;
+  tabs[tid].iframe=frame;
+
+  activate(tid);
+}
+
+function closeTab(tid){
+  if(Object.keys(tabs).length===1) return;
+  tabs[tid].tab.remove();
+  tabs[tid].iframe.remove();
+  delete tabs[tid];
+}
+
+function activate(tid){
+  active=tid;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.querySelectorAll("iframe").forEach(f=>f.classList.remove("active"));
+  tabs[tid].tab.classList.add("active");
+  tabs[tid].iframe.classList.add("active");
+}
+
+function normalize(v){
+  if(v.startsWith("http")) return v;
+  if(v.includes(".")&&!v.includes(" "))
+    return "https://"+v;
+  return "https://www.google.com/search?q="+encodeURIComponent(v);
+}
+
+async function go(value){
+  const input=value||address.value;
+  const url=normalize(input);
+  startLoading();
+  const r=await fetch("/page?url="+encodeURIComponent(url));
+  const d=await r.json();
+  tabs[active].iframe.srcdoc=d.html;
+  tabs[active].tab.firstChild.textContent=new URL(url).hostname;
+  lock.textContent=d.secure?"🔒":"🔒";
+  endLoading();
+}
+
+window.addEventListener("message",e=>{
+  if(e.data.type==="navigate") go(e.data.value);
+});
+
+newTab();
+</script>
+
+</body>
+</html>
