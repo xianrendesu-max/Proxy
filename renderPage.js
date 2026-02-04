@@ -1,27 +1,21 @@
-const fetch = require("node-fetch");
-const rewriteHtml = require("./rewriteHtml");
+const rewrite = require("./rewrite");
 
-module.exports = async function renderPage(req, res) {
-  const url = req.query.url;
-  if (!url) return res.status(400).send("URL required");
+module.exports = async function renderPage(fetchRes, baseUrl, res) {
+  let html = "";
 
   try {
-    const r = await fetch(url, {
-      redirect: "follow",
-      headers: {
-        "user-agent": "Mozilla/5.0",
-        "accept": "text/html,*/*"
-      }
-    });
-
-    const html = await r.text();
-    const rewritten = rewriteHtml(html, url);
-
-    res.set("content-type", "text/html; charset=utf-8");
-    res.send(rewritten);
+    html = await fetchRes.text();
   } catch (e) {
-    res.status(500).send(
-      `<h1>Page Load Failed</h1><pre>${e.toString()}</pre>`
-    );
+    res.statusCode = 500;
+    res.end("Failed to read HTML");
+    return;
   }
+
+  try {
+    html = rewrite(html, baseUrl);
+  } catch (e) {
+    // rewrite 失敗しても素HTMLは返す
+  }
+
+  res.end(html);
 };
