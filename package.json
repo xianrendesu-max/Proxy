@@ -1,17 +1,18 @@
 {
-  "name": "mini-chrome-proxy",
+  "name": "sennin-puppeteer-browser",
   "version": "1.0.0",
-  "description": "Chrome-like proxy browser (educational)",
+  "description": "Full-featured Puppeteer SPA browser with admin/logs",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "npx puppeteer browsers install chrome"
+    "start": "node server.js"
   },
   "engines": {
     "node": "18.x"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "puppeteer": "^22.8.2"
+    "puppeteer": "^21.3.8",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0"
   }
 }
