@@ -1,21 +1,16 @@
-const rewrite = require("./rewrite");
+const { getPage } = require("./tabPool");
+const { rewriteHtml } = require("./rewriteHtml");
 
-module.exports = async function renderPage(fetchRes, baseUrl, res) {
-  let html = "";
+async function renderPage(url) {
+  const page = await getPage(url);
 
-  try {
-    html = await fetchRes.text();
-  } catch (e) {
-    res.statusCode = 500;
-    res.end("Failed to read HTML");
-    return;
-  }
+  await page.goto(url, {
+    waitUntil: "networkidle2",
+    timeout: 60000
+  });
 
-  try {
-    html = rewrite(html, baseUrl);
-  } catch (e) {
-    // rewrite 失敗しても素HTMLは返す
-  }
+  const html = await page.content();
+  return rewriteHtml(html, url);
+}
 
-  res.end(html);
-};
+module.exports = { renderPage };
