@@ -1,33 +1,21 @@
-const fetch = require("node-fetch");
-const renderPage = require("./renderPage");
-const rewrite = require("./rewrite");
+const puppeteer = require("puppeteer");
 
-module.exports = async function browser(req, res) {
-  const url = req.query.url;
-  if (!url) {
-    res.statusCode = 400;
-    res.end("URL required");
-    return;
-  }
+let browser;
 
-  try {
-    const r = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      }
-    });
+async function getBrowser() {
+  if (browser) return browser;
 
-    const contentType = r.headers.get("content-type") || "text/html";
-    res.setHeader("Content-Type", contentType);
+  browser = await puppeteer.launch({
+    headless: "new",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-web-security",
+      "--disable-features=IsolateOrigins,site-per-process"
+    ]
+  });
 
-    if (!contentType.includes("text/html")) {
-      r.body.pipe(res);
-      return;
-    }
+  return browser;
+}
 
-    await renderPage(r, url, res);
-  } catch (e) {
-    res.statusCode = 500;
-    res.end("Browser fetch failed");
-  }
-};
+module.exports = { getBrowser };
