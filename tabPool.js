@@ -1,42 +1,40 @@
-export class TabPool {
-  constructor(tabsEl, framesEl) {
-    this.tabsEl = tabsEl;
-    this.framesEl = framesEl;
-    this.tabs = {};
-    this.active = null;
-    this.id = 0;
-    this.newTab();
-  }
+let nextId = 1;
+const tabs = {};
 
-  newTab() {
-    const id = this.id++;
-    const tab = document.createElement("div");
-    tab.className = "tab";
-    tab.textContent = "New Tab";
-    tab.onclick = () => this.activate(id);
-
-    const iframe = document.createElement("iframe");
-    iframe.src = "/page?url=https://example.com";
-
-    this.tabs[id] = { tab, iframe };
-    this.tabsEl.insertBefore(tab, newTab);
-    this.framesEl.appendChild(iframe);
-    this.activate(id);
-  }
-
-  activate(id) {
-    this.active = id;
-    Object.values(this.tabs).forEach(t => {
-      t.tab.classList.remove("active");
-      t.iframe.classList.remove("active");
-    });
-    this.tabs[id].tab.classList.add("active");
-    this.tabs[id].iframe.classList.add("active");
-  }
-
-  navigate(url) {
-    const t = this.tabs[this.active];
-    t.iframe.src = "/page?url=" + encodeURIComponent(url);
-    t.tab.textContent = new URL(url).hostname;
-  }
+function createTab(initialUrl) {
+  const id = nextId++;
+  tabs[id] = {
+    id,
+    url: initialUrl || null,
+    createdAt: Date.now()
+  };
+  return tabs[id];
 }
+
+function getTab(id) {
+  return tabs[id] || null;
+}
+
+function updateTab(id, url) {
+  if (!tabs[id]) return null;
+  tabs[id].url = url;
+  return tabs[id];
+}
+
+function closeTab(id) {
+  if (!tabs[id]) return false;
+  delete tabs[id];
+  return true;
+}
+
+function listTabs() {
+  return Object.values(tabs);
+}
+
+module.exports = {
+  createTab,
+  getTab,
+  updateTab,
+  closeTab,
+  listTabs
+};
