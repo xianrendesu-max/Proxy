@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Admin Panel</title>
+<style>
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f9f9f9;
+  color: #202124;
+}
+header {
+  background: #1a73e8;
+  color: white;
+  padding: 16px;
+  text-align: center;
+}
+h1 { margin: 0; font-size: 24px; }
+section { padding: 16px; }
+#logs {
+  max-height: 400px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  padding: 8px;
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+button {
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-right: 8px;
+}
+button:hover { background: #1669c1; }
+#status { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Admin Panel</h1>
+</header>
+
+<section>
+  <div>
+    メンテナンスモード: <span id="status">OFF</span>
+    <button id="toggleBtn">切り替え</button>
+  </div>
+</section>
+
+<section>
+  <h2>アクセスログ</h2>
+  <div id="logs"></div>
+</section>
+
+<script>
+const logsEl = document.getElementById("logs");
+const statusEl = document.getElementById("status");
+const toggleBtn = document.getElementById("toggleBtn");
+
+async function fetchStatus() {
+  // サーバーに現在の状態を確認するエンドポイントがあればここで取得
+  // 今は localStorage で表示だけ
+  statusEl.textContent = localStorage.getItem("maintenanceMode") === "true" ? "ON" : "OFF";
+}
+
+async function toggleMaintenance() {
+  const password = prompt("管理者パスワードを入力してください");
+  if (!password) return;
+
+  const res = await fetch("/toggle-maintenance", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ password })
+  });
+  const data = await res.json();
+  if (data.status === "ok") {
+    localStorage.setItem("maintenanceMode", data.maintenanceMode);
+    statusEl.textContent = data.maintenanceMode ? "ON" : "OFF";
+    addLog("メンテナンスモード切り替え: " + (data.maintenanceMode ? "ON" : "OFF"));
+  } else {
+    alert("パスワードが違います");
+  }
+}
+
+function addLog(msg) {
+  const time = new Date().toLocaleTimeString();
+  logsEl.textContent += `[${time}] ${msg}\n`;
+  logsEl.scrollTop = logsEl.scrollHeight;
+}
+
+// WebSocket などでリアルタイム更新も可能
+// ここでは簡単に fetch でログファイルを取得するイメージ
+async function fetchLogs() {
+  try {
+    const res = await fetch("/access.log");
+    if (res.ok) {
+      const text = await res.text();
+      logsEl.textContent = text;
+      logsEl.scrollTop = logsEl.scrollHeight;
+    }
+  } catch(e) {
+    addLog("ログ取得失敗: " + e.message);
+  }
+}
+
+toggleBtn.onclick = toggleMaintenance;
+fetchStatus();
+setInterval(fetchLogs, 5000); // 5秒ごとに更新
+</script>
+
+</body>
+</html>
