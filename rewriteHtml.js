@@ -2,34 +2,57 @@ const { URL } = require("url");
 
 module.exports = function rewriteHtml(html, baseUrl) {
   return html
-    /* CSP メタ削除 */
+    /* CSP meta のみ削除（やりすぎない） */
     .replace(
       /<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*>/gi,
       ""
     )
-    /* CSP ヘッダ削除対策 */
-    .replace(/content-security-policy/gi, "")
-    /* base 強制 */
+
+    /* ナビゲーション用属性のみ書き換え */
     .replace(
-      /<head>/i,
-      `<head>
-<base href="/asset?url=${encodeURIComponent(baseUrl)}">
-<script>
-window.__ORIGIN__=${JSON.stringify(baseUrl)};
-</script>`
-    )
-    /* href/src/action 全書き換え */
-    .replace(
-      /(href|src|action)=["']([^"']+)["']/gi,
+      /(href|action)=["']([^"']+)["']/gi,
       (m, attr, link) => {
         if (
           link.startsWith("data:") ||
           link.startsWith("mailto:") ||
-          link.startsWith("javascript:")
+          link.startsWith("javascript:") ||
+          link.startsWith("#")
         ) return m;
+
         try {
           const abs = new URL(link, baseUrl).href;
-          return `${attr}="/asset?url=${encodeURIComponent(abs)}"`;
+          return `${attr}="/page?url=${encodeURIComponent(abs)}"`;
+        } catch {
+          return m;
+        }
+      }
+    )
+
+    /* src は asset だが link rel=pre* は除外 */
+    .replace(
+      /<script[^>]+src=["']([^"']+)["'][^>]*>/gi,
+      (m, src) => {
+        try {
+          const abs = new URL(src, baseUrl).href;
+          return m.replace(
+            src,
+            `/asset?url=${encodeURIComponent(abs)}`
+          );
+        } catch {
+          return m;
+        }
+      }
+    )
+
+    .replace(
+      /<img[^>]+src=["']([^"']+)["'][^>]*>/gi,
+      (m, src) => {
+        try {
+          const abs = new URL(src, baseUrl).href;
+          return m.replace(
+            src,
+            `/asset?url=${encodeURIComponent(abs)}`
+          );
         } catch {
           return m;
         }
