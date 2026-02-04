@@ -3,7 +3,6 @@ const compression = require("compression");
 const morgan = require("morgan");
 const puppeteer = require("puppeteer");
 const path = require("path");
-const fs = require("fs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,7 +30,15 @@ app.use((req, res, next) => {
 });
 
 // Puppeteer browser pool
-let browserPromise = puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+let browserPromise = puppeteer.launch({
+  headless: "new",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-web-security",
+    "--disable-features=IsolateOrigins,site-per-process"
+  ]
+});
 
 // Render a page with Puppeteer
 app.get("/page", async (req, res) => {
@@ -43,11 +50,19 @@ app.get("/page", async (req, res) => {
   try {
     const browser = await browserPromise;
     const page = await browser.newPage();
-    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-    await page.setExtraHTTPHeaders({ "Referer": "" });
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 });
+
+    // Bot回避用
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+    );
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+    });
+
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
     const content = await page.content();
     await page.close();
+
     res.send(content);
   } catch (e) {
     console.error("Page fetch error:", e);
@@ -58,6 +73,7 @@ app.get("/page", async (req, res) => {
 // Admin log page
 app.get("/admin", (req, res) => {
   if (!isAdmin(req)) return res.status(403).send("Forbidden");
+
   let html = `<h1>Admin Logs</h1>
   <button onclick="toggleMaintenance()">${maintenance ? "Disable" : "Enable"} Maintenance</button>
   <ul>`;
@@ -67,7 +83,7 @@ app.get("/admin", (req, res) => {
   html += `</ul>
   <script>
     async function toggleMaintenance() {
-      const res = await fetch('/maintenance', {method:'POST'});
+      await fetch('/maintenance', { method:'POST' });
       location.reload();
     }
   </script>`;
