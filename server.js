@@ -1,95 +1,62 @@
 const express = require("express");
 const fetch = require("node-fetch");
-const { URL } = require("url");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* 静的ファイル */
+/* ===== 静的ファイル ===== */
 app.use(express.static("public"));
 
-/* ===== HTMLページ（JSONにしない / 加工しない） ===== */
+/* ===== ページ取得 ===== */
 app.get("/page", async (req, res) => {
-  const target = req.query.url;
-  if (!target) {
-    res.status(400).end("url required");
-    return;
-  }
-
-  let url;
-  try {
-    url = new URL(target);
-  } catch {
-    res.status(400).end("invalid url");
-    return;
-  }
+  const url = req.query.url;
+  if (!url) return res.status(400).send("no url");
 
   try {
-    const r = await fetch(url.href, {
-      redirect: "follow",
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        "accept": "*/*"
-      }
-    });
+    const r = await fetch(url, { redirect: "follow" });
+    const html = await r.text();
 
-    /* ステータス維持 */
-    res.status(r.status);
-
-    /* 危険・邪魔なヘッダだけ除去 */
-    r.headers.forEach((value, key) => {
-      if (
-        key.toLowerCase() === "content-encoding" ||
-        key.toLowerCase() === "content-security-policy" ||
-        key.toLowerCase() === "x-frame-options"
-      ) {
-        return;
-      }
-      res.setHeader(key, value);
-    });
-
-    /* ★最重要：HTMLをJSONにしない／そのまま流す */
-    r.body.pipe(res);
+    res.set("Content-Type", "text/html; charset=UTF-8");
+    res.send(html);
   } catch (e) {
-    res.status(502).end("fetch failed");
+    res.status(500).send(String(e));
   }
 });
 
-/* ===== CSS / JS / 画像 ===== */
+/* ===== アセット取得 ===== */
 app.get("/asset", async (req, res) => {
-  const target = req.query.url;
-  if (!target) {
-    res.status(400).end();
-    return;
-  }
+  const url = req.query.url;
+  if (!url) return res.status(400).send("no url");
 
   try {
-    const r = await fetch(target, {
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
-      }
-    });
+    const r = await fetch(url, { redirect: "follow" });
 
-    res.status(r.status);
-
-    r.headers.forEach((value, key) => {
-      if (
-        key.toLowerCase() === "content-encoding" ||
-        key.toLowerCase() === "content-security-policy"
-      ) {
-        return;
-      }
-      res.setHeader(key, value);
-    });
-
+    res.set("Content-Type", r.headers.get("content-type") || "application/octet-stream");
     r.body.pipe(res);
-  } catch {
-    res.status(502).end();
+  } catch (e) {
+    res.status(500).send(String(e));
+  }
+});
+
+/* ===== ★核心：相対パス完全吸収 ===== */
+app.get("/*", async (req, res) => {
+  const referer = req.headers.referer;
+  if (!referer) return res.status(404).send("no referer");
+
+  try {
+    const base = new URL(referer);
+    const target = new URL(req.originalUrl, base).toString();
+
+    const r = await fetch(target, { redirect: "follow" });
+
+    res.set("Content-Type", r.headers.get("content-type") || "text/html");
+    r.body.pipe(res);
+  } catch (e) {
+    res.status(500).send(String(e));
   }
 });
 
 app.listen(PORT, () => {
-  console.log("Light SPA Browser running on " + PORT);
+  console.log("running on", PORT);
 });
