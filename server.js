@@ -1,62 +1,46 @@
 const express = require("express");
-const fetch = require("node-fetch");
 const path = require("path");
+const { renderPage } = require("./renderPage");
+const { fetchAsset } = require("./fetchAsset");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* ===== 静的ファイル ===== */
 app.use(express.static("public"));
 
-/* ===== ページ取得 ===== */
+app.get("/", (_, res) => {
+  res.sendFile(path.join(__dirname, "public/index.html"));
+});
+
 app.get("/page", async (req, res) => {
   const url = req.query.url;
-  if (!url) return res.status(400).send("no url");
+  if (!url) return res.status(400).send("URL required");
 
   try {
-    const r = await fetch(url, { redirect: "follow" });
-    const html = await r.text();
-
-    res.set("Content-Type", "text/html; charset=UTF-8");
+    const html = await renderPage(url);
     res.send(html);
   } catch (e) {
-    res.status(500).send(String(e));
+    res.status(500).send(`<pre>${e.toString()}</pre>`);
   }
 });
 
-/* ===== アセット取得 ===== */
 app.get("/asset", async (req, res) => {
   const url = req.query.url;
-  if (!url) return res.status(400).send("no url");
+  if (!url) return res.sendStatus(400);
 
   try {
-    const r = await fetch(url, { redirect: "follow" });
-
-    res.set("Content-Type", r.headers.get("content-type") || "application/octet-stream");
-    r.body.pipe(res);
-  } catch (e) {
-    res.status(500).send(String(e));
+    const { type, body } = await fetchAsset(url);
+    res.set("Content-Type", type);
+    res.send(body);
+  } catch {
+    res.sendStatus(500);
   }
 });
 
-/* ===== ★核心：相対パス完全吸収 ===== */
-app.get("/*", async (req, res) => {
-  const referer = req.headers.referer;
-  if (!referer) return res.status(404).send("no referer");
-
-  try {
-    const base = new URL(referer);
-    const target = new URL(req.originalUrl, base).toString();
-
-    const r = await fetch(target, { redirect: "follow" });
-
-    res.set("Content-Type", r.headers.get("content-type") || "text/html");
-    r.body.pipe(res);
-  } catch (e) {
-    res.status(500).send(String(e));
-  }
+app.use((_, res) => {
+  res.redirect("/");
 });
 
 app.listen(PORT, () => {
-  console.log("running on", PORT);
+  console.log("Ultra SPA Browser running on port " + PORT);
 });
