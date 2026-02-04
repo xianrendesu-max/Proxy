@@ -1,30 +1,45 @@
 const express = require("express");
+const fetch = require("node-fetch");
 const compression = require("compression");
-const renderPage = require("./renderPage");
+const rewriteHtml = require("./rewriteHtml");
 const fetchAsset = require("./fetchAsset");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* gzip 圧縮 */
 app.use(compression());
+app.use(express.static("public"));
 
-/* SPA ブラウザ UI */
-app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/browser.html");
+/* ===== HTML ページ ===== */
+app.get("/page", async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.sendStatus(400);
+
+  try {
+    const r = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+
+    const ct = r.headers.get("content-type") || "text/html";
+    res.set("Content-Type", ct);
+
+    if (!ct.includes("text/html")) {
+      r.body.pipe(res);
+      return;
+    }
+
+    let html = await r.text();
+    html = rewriteHtml(html, url);
+
+    res.send(html);
+  } catch (e) {
+    res.status(500).send("Fetch failed");
+  }
 });
 
-/* HTML プロキシ */
-app.get("/page", renderPage);
-
-/* アセット完全中継 */
+/* ===== CSS / JS / 画像 ===== */
 app.get("/asset", fetchAsset);
 
-/* フォールバック */
-app.use((req, res) => {
-  res.status(404).send("Not Found");
-});
-
 app.listen(PORT, () => {
-  console.log("light-spa-browser MAX running on port " + PORT);
+  console.log("Light SPA Browser running on port " + PORT);
 });
