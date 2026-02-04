@@ -2,134 +2,58 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Mini Chrome</title>
-
+<title>Home</title>
 <style>
-body { margin:0; font-family:system-ui; background:#f1f3f4; }
-
-#tabs {
-  display:flex; gap:4px; padding:6px;
-  background:#dee1e6;
+body {
+  margin:0;
+  font-family:system-ui;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
 }
-
-.tab {
+#sites {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,100px);
+  gap:20px;
+}
+.site {
+  cursor:pointer;
+  text-align:center;
+}
+.site div {
+  width:64px;
+  height:64px;
   background:#e8eaed;
-  padding:6px 10px;
-  border-radius:8px 8px 0 0;
+  border-radius:16px;
   display:flex;
   align-items:center;
-  gap:6px;
-  cursor:pointer;
+  justify-content:center;
+  margin:auto;
 }
-
-.tab.active { background:#fff; }
-
-.tab span.close {
-  font-size:12px;
-  cursor:pointer;
-}
-
-#toolbar {
-  display:flex;
-  gap:6px;
-  padding:8px;
-  background:#fff;
-  border-bottom:1px solid #ccc;
-}
-
-#lock {
-  padding:6px;
-}
-
-#address {
-  flex:1;
-  padding:8px;
-  border-radius:16px;
-  border:1px solid #ccc;
-}
-
-iframe {
-  width:100%;
-  height:calc(100vh - 92px);
-  border:none;
-  display:none;
-}
-
-iframe.active { display:block; }
 </style>
 </head>
-
 <body>
 
-<div id="tabs">
-  <button onclick="newTab()">＋</button>
-</div>
-
-<div id="toolbar">
-  <div id="lock">🔓</div>
-  <input id="address" placeholder="検索またはURL">
-  <button onclick="go()">Go</button>
-</div>
-
-<div id="frames"></div>
+<h1>senninbrowser</h1>
+<div id="sites"></div>
 
 <script>
-let tabs = {};
-let active = null;
-let id = 0;
-
-function newTab() {
-  const tid = id++;
-  tabs[tid] = { iframe:null, history:[], index:-1 };
-
-  const tab = document.createElement("div");
-  tab.className = "tab";
-  tab.innerHTML = `<span>New</span><span class="close">×</span>`;
-  tab.onclick = () => activate(tid);
-  tab.querySelector(".close").onclick = e => {
-    e.stopPropagation();
-    closeTab(tid);
-  };
-
-  document.getElementById("tabs").appendChild(tab);
-  tabs[tid].tab = tab;
-
-  const frame = document.createElement("iframe");
-  document.getElementById("frames").appendChild(frame);
-  tabs[tid].iframe = frame;
-
-  activate(tid);
-}
-
-function closeTab(tid) {
-  tabs[tid].tab.remove();
-  tabs[tid].iframe.remove();
-  delete tabs[tid];
-}
-
-function activate(tid) {
-  active = tid;
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  document.querySelectorAll("iframe").forEach(f=>f.classList.remove("active"));
-  tabs[tid].tab.classList.add("active");
-  tabs[tid].iframe.classList.add("active");
-}
-
-async function go() {
-  const input = address.value;
-  const url = input.includes(".") ? 
-    (input.startsWith("http") ? input : "https://" + input) :
-    "https://www.google.com/search?q=" + encodeURIComponent(input);
-
-  const res = await fetch("/page?url=" + encodeURIComponent(url));
-  const data = await res.json();
-
-  tabs[active].iframe.srcdoc = data.html;
-  tabs[active].tab.firstChild.textContent = new URL(url).hostname;
-  document.getElementById("lock").textContent = data.secure ? "🔒" : "🔓";
-}
-
-newTab();
+fetch("/sites.json")
+  .then(r=>r.json())
+  .then(sites=>{
+    const box=document.getElementById("sites");
+    sites.forEach(s=>{
+      const d=document.createElement("div");
+      d.className="site";
+      d.innerHTML=`<div>🌐</div>${s.name}`;
+      d.onclick=()=>parent.postMessage(
+        {type:"navigate", value:s.url}, "*"
+      );
+      box.appendChild(d);
+    });
+  });
 </script>
 
 </body>
