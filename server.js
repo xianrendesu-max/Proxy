@@ -39,6 +39,11 @@ async function getBrowser() {
 }
 
 /* ===============================
+   メンテナンスモード
+================================ */
+let maintenanceMode = false;
+
+/* ===============================
    HTML エスケープ
 ================================ */
 function escapeHtml(str) {
@@ -96,6 +101,10 @@ app.get("/page", async (req, res) => {
     return res.sendFile(path.join(__dirname, "public/error.html"));
   }
 
+  if (maintenanceMode) {
+    return res.sendFile(path.join(__dirname, "public/maintenance.html"));
+  }
+
   try {
     const html = await renderWithPuppeteer(url);
     res.setHeader("Content-Type", "text/html; charset=UTF-8");
@@ -107,7 +116,24 @@ app.get("/page", async (req, res) => {
 });
 
 /* ===============================
-   home / error 明示ルート
+   管理者用ログ画面
+================================ */
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/admin.html"));
+});
+
+app.post("/toggle-maintenance", (req, res) => {
+  const { password } = req.body;
+  if (password === "sennin") {
+    maintenanceMode = !maintenanceMode;
+    res.json({ status: "ok", maintenanceMode });
+  } else {
+    res.json({ status: "error", message: "Wrong password" });
+  }
+});
+
+/* ===============================
+   home / error / maintenance
 ================================ */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public/index.html"));
@@ -119,6 +145,22 @@ app.get("/home.html", (req, res) => {
 
 app.get("/error.html", (req, res) => {
   res.sendFile(path.join(__dirname, "public/error.html"));
+});
+
+app.get("/maintenance.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/maintenance.html"));
+});
+
+/* ===============================
+   検索バー Admin/sennin 検知
+================================ */
+app.post("/detect-admin", (req, res) => {
+  const { input } = req.body;
+  if (input === "Admin/sennin") {
+    res.json({ admin: true });
+  } else {
+    res.json({ admin: false });
+  }
 });
 
 /* ===============================
