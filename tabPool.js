@@ -1,40 +1,18 @@
-let nextId = 1;
-const tabs = {};
+const { getBrowser } = require("./browser");
 
-function createTab(initialUrl) {
-  const id = nextId++;
-  tabs[id] = {
-    id,
-    url: initialUrl || null,
-    createdAt: Date.now()
-  };
-  return tabs[id];
+const pool = new Map();
+
+async function getPage(url) {
+  if (pool.has(url)) return pool.get(url);
+
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+
+  await page.setBypassCSP(true);
+  await page.setViewport({ width: 1280, height: 800 });
+
+  pool.set(url, page);
+  return page;
 }
 
-function getTab(id) {
-  return tabs[id] || null;
-}
-
-function updateTab(id, url) {
-  if (!tabs[id]) return null;
-  tabs[id].url = url;
-  return tabs[id];
-}
-
-function closeTab(id) {
-  if (!tabs[id]) return false;
-  delete tabs[id];
-  return true;
-}
-
-function listTabs() {
-  return Object.values(tabs);
-}
-
-module.exports = {
-  createTab,
-  getTab,
-  updateTab,
-  closeTab,
-  listTabs
-};
+module.exports = { getPage };
