@@ -1,7 +1,7 @@
 {
-  "name": "html-proxy",
+  "name": "mini-chrome-proxy",
   "version": "1.0.0",
-  "description": "HTML Proxy with CSS JS Image support",
+  "description": "Chrome-like proxy browser (educational)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
