@@ -1,19 +1,22 @@
 const fetch = require("node-fetch");
 
-module.exports = async function fetchAsset(req, res) {
-  const url = req.query.url;
-  if (!url) return res.sendStatus(400);
+async function fetchAsset(url) {
+  const r = await fetch(url, {
+    redirect: "follow",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122",
+      "Accept": "*/*",
+      "Accept-Language": "ja,en;q=0.9",
+      "Referer": url,
+      "Origin": new URL(url).origin
+    }
+  });
 
-  try {
-    const r = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" }
-    });
+  const type = r.headers.get("content-type") || "application/octet-stream";
+  const body = await r.buffer();
 
-    const ct = r.headers.get("content-type");
-    if (ct) res.set("Content-Type", ct);
+  return { type, body };
+}
 
-    r.body.pipe(res);
-  } catch {
-    res.sendStatus(500);
-  }
-};
+module.exports = { fetchAsset };
