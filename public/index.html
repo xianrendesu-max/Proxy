@@ -148,7 +148,7 @@ iframe.active{ display:block; }
 
 <!-- アドレスバー -->
 <div id="toolbar">
-  <div id="lock">🏠</div>
+  <div id="lock">home</div>
   <input id="address" placeholder="検索またはURLを入力">
   <button id="go" onclick="go()">↵</button>
 </div>
@@ -208,7 +208,7 @@ function activate(tid){
   document.querySelectorAll("iframe").forEach(f=>f.classList.remove("active"));
   tabs[tid].tab.classList.add("active");
   tabs[tid].iframe.classList.add("active");
-  lock.textContent="🏠";
+  lock.textContent="home";
 }
 
 /* ===== ナビゲーション ===== */
@@ -223,11 +223,12 @@ async function go(value){
   const input=value||address.value;
   const url=normalize(input);
   startLoading();
-  const r=await fetch("/page?url="+encodeURIComponent(url));
-  const d=await r.json();
-  tabs[active].iframe.srcdoc=d.html;
+
+  /* ★変更：fetch + srcdoc を廃止し iframe.src に直接指定 */
+  tabs[active].iframe.src="/page?url="+encodeURIComponent(url);
   tabs[active].tab.firstChild.textContent=new URL(url).hostname;
-  lock.textContent=d.secure?"🔒":"⚠️";
+  lock.textContent=url.startsWith("https://")?"🔒":"⚠️";
+
   endLoading();
 }
 
