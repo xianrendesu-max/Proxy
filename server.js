@@ -1,45 +1,95 @@
 const express = require("express");
 const fetch = require("node-fetch");
-const compression = require("compression");
-const rewriteHtml = require("./rewriteHtml");
-const fetchAsset = require("./fetchAsset");
+const { URL } = require("url");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(compression());
+/* 静的ファイル */
 app.use(express.static("public"));
 
-/* ===== HTML ページ ===== */
+/* ===== HTMLページ（JSONにしない / 加工しない） ===== */
 app.get("/page", async (req, res) => {
-  const url = req.query.url;
-  if (!url) return res.sendStatus(400);
+  const target = req.query.url;
+  if (!target) {
+    res.status(400).end("url required");
+    return;
+  }
+
+  let url;
+  try {
+    url = new URL(target);
+  } catch {
+    res.status(400).end("invalid url");
+    return;
+  }
 
   try {
-    const r = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" }
+    const r = await fetch(url.href, {
+      redirect: "follow",
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        "accept": "*/*"
+      }
     });
 
-    const ct = r.headers.get("content-type") || "text/html";
-    res.set("Content-Type", ct);
+    /* ステータス維持 */
+    res.status(r.status);
 
-    if (!ct.includes("text/html")) {
-      r.body.pipe(res);
-      return;
-    }
+    /* 危険・邪魔なヘッダだけ除去 */
+    r.headers.forEach((value, key) => {
+      if (
+        key.toLowerCase() === "content-encoding" ||
+        key.toLowerCase() === "content-security-policy" ||
+        key.toLowerCase() === "x-frame-options"
+      ) {
+        return;
+      }
+      res.setHeader(key, value);
+    });
 
-    let html = await r.text();
-    html = rewriteHtml(html, url);
-
-    res.send(html);
+    /* ★最重要：HTMLをJSONにしない／そのまま流す */
+    r.body.pipe(res);
   } catch (e) {
-    res.status(500).send("Fetch failed");
+    res.status(502).end("fetch failed");
   }
 });
 
 /* ===== CSS / JS / 画像 ===== */
-app.get("/asset", fetchAsset);
+app.get("/asset", async (req, res) => {
+  const target = req.query.url;
+  if (!target) {
+    res.status(400).end();
+    return;
+  }
+
+  try {
+    const r = await fetch(target, {
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+      }
+    });
+
+    res.status(r.status);
+
+    r.headers.forEach((value, key) => {
+      if (
+        key.toLowerCase() === "content-encoding" ||
+        key.toLowerCase() === "content-security-policy"
+      ) {
+        return;
+      }
+      res.setHeader(key, value);
+    });
+
+    r.body.pipe(res);
+  } catch {
+    res.status(502).end();
+  }
+});
 
 app.listen(PORT, () => {
-  console.log("Light SPA Browser running on port " + PORT);
+  console.log("Light SPA Browser running on " + PORT);
 });
